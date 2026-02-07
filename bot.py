@@ -1,11 +1,15 @@
-import requests, time, cv2, numpy as np
+import requests
+import time
+import cv2
+import numpy as np
 from io import BytesIO
 from PIL import Image
+import os
 
 # ==============================
 # TELEGRAM CONFIG
 # ==============================
-TOKEN = "8501955227:AAG9nfxSoN84lLMp3D7wfSwIjwAuH69C3_U"
+TOKEN = os.getenv("TOKEN")  # Railway Variables lo TOKEN set cheyyi
 BASE_URL = "https://api.telegram.org/bot" + TOKEN
 
 # ==============================
@@ -28,79 +32,79 @@ def get_image(file_id):
     ).content
 
 # ==============================
-# IMAGE ANALYSIS (AUTO)
+# IMAGE ANALYSIS (AGGRESSIVE)
 # ==============================
 def analyze_image(image_bytes):
     img = Image.open(BytesIO(image_bytes)).convert("RGB")
     img = np.array(img)
 
     h, w, _ = img.shape
-    crop = img[int(h*0.3):int(h*0.85), int(w*0.5):int(w*0.8)]
+
+    # focus on right side (latest candles)
+    crop = img[int(h*0.3):int(h*0.85), int(w*0.55):int(w*0.9)]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 
-    # Candle direction
+    # Candle direction (brightness bias)
     avg = np.mean(gray)
-    candle = "bullish" if avg > 140 else "bearish"
+    candle = "bullish" if avg > 138 else "bearish"
 
-    # Wick strength
+    # Wick / rejection (LOOSENED)
     edges = cv2.Canny(gray, 50, 150)
-    wick_strength = np.mean(edges)
+    edge_strength = np.mean(edges)
 
-    if wick_strength > 30:
-        wick = "strong"
-    else:
-        wick = "weak"
+    wick = "strong" if edge_strength > 18 else "weak"
 
     return candle, wick
 
 # ==============================
-# AUTO DECISION ENGINE
+# AGGRESSIVE DECISION ENGINE
 # ==============================
-def auto_decide(candle, wick):
-    if candle == "bullish" and wick == "strong":
+def aggressive_decide(candle, wick):
+    if candle == "bullish":
         return (
             "📈 CALL\n\n"
             "Reason:\n"
-            "• Bullish candle pressure\n"
-            "• Strong rejection detected\n"
-            "Entry: Next 1-minute candle\n"
-            "Risk: MEDIUM"
+            "• Bullish momentum detected\n"
+            f"• Wick: {wick}\n"
+            "• Aggressive continuation bias\n\n"
+            "Risk: HIGH\n"
+            "Entry: NEXT 1-minute candle"
         )
 
-    if candle == "bearish" and wick == "strong":
+    if candle == "bearish":
         return (
             "📉 PUT\n\n"
             "Reason:\n"
-            "• Bearish candle pressure\n"
-            "• Strong rejection detected\n"
-            "Entry: Next 1-minute candle\n"
-            "Risk: MEDIUM"
+            "• Bearish pressure detected\n"
+            f"• Wick: {wick}\n"
+            "• Aggressive pullback bias\n\n"
+            "Risk: HIGH\n"
+            "Entry: NEXT 1-minute candle"
         )
 
     return (
         "⛔ NO TRADE\n\n"
         "Reason:\n"
-        "• Weak or unclear candle structure\n"
-        "• High noise (1-minute TF)\n"
+        "• Unclear structure\n"
         "Risk: HIGH"
     )
 
 # ==============================
 # MESSAGE HANDLER
 # ==============================
-def handle_message(msg):
-    chat_id = msg["chat"]["id"]
+def handle_message(message):
+    chat_id = message["chat"]["id"]
 
-    if "photo" in msg:
-        file_id = msg["photo"][-1]["file_id"]
-        img = get_image(file_id)
+    if "photo" in message:
+        file_id = message["photo"][-1]["file_id"]
+        img_bytes = get_image(file_id)
 
-        candle, wick = analyze_image(img)
-        decision = auto_decide(candle, wick)
+        candle, wick = analyze_image(img_bytes)
+        decision = aggressive_decide(candle, wick)
 
         send_message(
             chat_id,
-            f"🤖 AUTO IMAGE SIGNAL (1M)\n\n"
+            f"🤖 AUTO IMAGE SIGNAL (1M) – AGGRESSIVE\n\n"
             f"Detected:\n"
             f"• Candle: {candle}\n"
             f"• Wick: {wick}\n\n"
@@ -111,7 +115,7 @@ def handle_message(msg):
 # BOT LOOP
 # ==============================
 last_update_id = None
-print("🤖 AUTO IMAGE BOT v4 RUNNING...")
+print("🔥 AUTO IMAGE BOT v4 AGGRESSIVE RUNNING...")
 
 while True:
     updates = requests.get(
@@ -125,3 +129,4 @@ while True:
             handle_message(update["message"])
 
     time.sleep(1)
+
