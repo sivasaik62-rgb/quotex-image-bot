@@ -9,7 +9,7 @@ from PIL import Image
 # TELEGRAM CONFIG (HARDCODED)
 # ==============================
 TOKEN = "8501955227:AAG9nfxSoN84lLMp3D7wfSwIjwAuH69C3_U"
-BASE_URL = f"https://api.telegram.org/bot{8501955227:AAG9nfxSoN84lLMp3D7wfSwIjwAuH69C3_U}"
+BASE_URL = f"https://api.telegram.org/bot{TOKEN}"
 
 # ==============================
 # TELEGRAM FUNCTIONS
@@ -106,6 +106,3 @@ while True:
             )
 
     time.sleep(1)
-
-
-
