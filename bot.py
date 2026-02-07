@@ -4,12 +4,11 @@ import cv2
 import numpy as np
 from io import BytesIO
 from PIL import Image
-import os
 
 # ==============================
-# TELEGRAM CONFIG
+# TELEGRAM CONFIG (HARDCODED)
 # ==============================
-TOKEN = os.getenv("TOKEN")  # Railway Variables lo TOKEN set cheyyi
+TOKEN = "8501955227:AAG9nfxSoN84lLMp3D7wfSwIjwAuH69C3_U"
 BASE_URL = "https://api.telegram.org/bot" + TOKEN
 
 # ==============================
@@ -40,18 +39,17 @@ def analyze_image(image_bytes):
 
     h, w, _ = img.shape
 
-    # focus on right side (latest candles)
+    # latest candles area
     crop = img[int(h*0.3):int(h*0.85), int(w*0.55):int(w*0.9)]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 
-    # Candle direction (brightness bias)
+    # candle direction (loosened)
     avg = np.mean(gray)
     candle = "bullish" if avg > 138 else "bearish"
 
-    # Wick / rejection (LOOSENED)
+    # wick / rejection (AGGRESSIVE threshold)
     edges = cv2.Canny(gray, 50, 150)
     edge_strength = np.mean(edges)
-
     wick = "strong" if edge_strength > 18 else "weak"
 
     return candle, wick
@@ -115,7 +113,7 @@ def handle_message(message):
 # BOT LOOP
 # ==============================
 last_update_id = None
-print("🔥 AUTO IMAGE BOT v4 AGGRESSIVE RUNNING...")
+print("🔥 AUTO IMAGE BOT v4 AGGRESSIVE RUNNING (HARDCODE TOKEN)...")
 
 while True:
     updates = requests.get(
@@ -129,4 +127,5 @@ while True:
             handle_message(update["message"])
 
     time.sleep(1)
+
 
