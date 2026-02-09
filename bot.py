@@ -6,79 +6,59 @@ from io import BytesIO
 from PIL import Image
 
 # ==============================
-# TELEGRAM CONFIG (HARDCODED)
+# TELEGRAM CONFIG
 # ==============================
 TOKEN = "8501955227:AAG9nfxSoN84lLMp3D7wfSwIjwAuH69C3_U"
 BASE_URL = "https://api.telegram.org/bot" + TOKEN
 
 # ==============================
-# TELEGRAM FUNCTIONS
+# TELEGRAM HELPERS
 # ==============================
 def send_message(chat_id, text):
     requests.post(
         BASE_URL + "/sendMessage",
-        json={
-            "chat_id": chat_id,
-            "text": text
-        }
+        json={"chat_id": chat_id, "text": text}
     )
 
 def download_image(file_id):
-    r = requests.get(
-        BASE_URL + "/getFile",
-        params={"file_id": file_id}
-    )
+    r = requests.get(BASE_URL + "/getFile", params={"file_id": file_id})
     file_path = r.json()["result"]["file_path"]
-    file_url = "https://api.telegram.org/file/bot" + TOKEN + "/" + file_path
-    return requests.get(file_url).content
+    return requests.get(
+        "https://api.telegram.org/file/bot" + TOKEN + "/" + file_path
+    ).content
 
 # ==============================
-# IMAGE ANALYSIS (SIMPLE)
+# IMAGE ANALYSIS – TREND MODE
 # ==============================
 def analyze_image(image_bytes):
     img = Image.open(BytesIO(image_bytes)).convert("RGB")
     img = np.array(img)
 
     h, w, _ = img.shape
-    crop = img[int(h*0.35):int(h*0.85), int(w*0.55):int(w*0.9)]
+
+    # focus only chart area (right half)
+    crop = img[int(h*0.35):int(h*0.85), int(w*0.45):int(w*0.9)]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
 
-    avg = np.mean(gray)
-    candle = "bullish" if avg > 135 else "bearish"
+    # split into past vs latest candles
+    left = gray[:, :gray.shape[1]//2]
+    right = gray[:, gray.shape[1]//2:]
 
-    edges = cv2.Canny(gray, 50, 150)
-    wick_strength = np.mean(edges)
-    wick = "strong" if wick_strength > 15 else "weak"
+    left_avg = np.mean(left)
+    right_avg = np.mean(right)
 
-    return candle, wick
-
-# ==============================
-# SIGNAL LOGIC
-# ==============================
-def build_signal(candle, wick):
-    if candle == "bullish":
-        return (
-            "📈 CALL\n\n"
-            "Reason:\n"
-            "• Bullish momentum detected\n"
-            f"• Wick: {wick}\n\n"
-            "Entry: NEXT 1-minute candle\n"
-            "Risk: HIGH"
-        )
+    # TREND MODE DECISION
+    if right_avg > left_avg:
+        direction = "CALL"
     else:
-        return (
-            "📉 PUT\n\n"
-            "Reason:\n"
-            "• Bearish pressure detected\n"
-            f"• Wick: {wick}\n\n"
-            "Entry: NEXT 1-minute candle\n"
-            "Risk: HIGH"
-        )
+        direction = "PUT"
+
+    return direction
 
 # ==============================
-# MAIN BOT LOOP
+# BOT LOOP – EVERY CANDLE
 # ==============================
-print("🔥 AUTO IMAGE BOT – FINAL STABLE VERSION RUNNING...")
+print("🔥 EVERY CANDLE TREND BOT RUNNING...")
 
 offset = None
 
@@ -96,16 +76,17 @@ while True:
             file_id = update["message"]["photo"][-1]["file_id"]
 
             img_bytes = download_image(file_id)
-            candle, wick = analyze_image(img_bytes)
-            signal = build_signal(candle, wick)
+            decision = analyze_image(img_bytes)
 
             send_message(
                 chat_id,
-                "🤖 AUTO IMAGE SIGNAL (1M)\n\n"
-                f"Detected:\n"
-                f"• Candle: {candle}\n"
-                f"• Wick: {wick}\n\n"
-                + signal
+                "🤖 EVERY CANDLE SIGNAL (1M)\n\n"
+                f"ACTION: {decision}\n\n"
+                "Rule:\n"
+                "• Trend-follow mode\n"
+                "• Same direction for next candle\n\n"
+                "Risk: HIGH\n"
+                "Note: Fixed stake only"
             )
 
     time.sleep(1)
